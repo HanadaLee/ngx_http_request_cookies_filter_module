@@ -19,12 +19,12 @@ typedef enum {
 
 
 /* Cookie flags bitmask for response rules */
-#define NGX_HTTP_COOKIE_FILTER_FLAG_SECURE      0x01
-#define NGX_HTTP_COOKIE_FILTER_FLAG_HTTPONLY    0x02
-#define NGX_HTTP_COOKIE_FILTER_FLAG_SAMESITE    0x04
-#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_SECURE   0x08
-#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_HTTPONLY 0x10
-#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_SAMESITE 0x20
+#define NGX_HTTP_COOKIE_FILTER_FLAG_SECURE       0x01
+#define NGX_HTTP_COOKIE_FILTER_FLAG_HTTPONLY     0x02
+#define NGX_HTTP_COOKIE_FILTER_FLAG_SAMESITE     0x04
+#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_SECURE    0x08
+#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_HTTPONLY  0x10
+#define NGX_HTTP_COOKIE_FILTER_FLAG_NO_SAMESITE  0x20
 
 
 /* SameSite attribute values */
@@ -88,24 +88,66 @@ static ngx_int_t ngx_http_cookie_filter_init(ngx_conf_t *cf);
 static void *ngx_http_cookie_filter_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_cookie_filter_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
-static char *ngx_http_request_cookie_filter_conf(ngx_conf_t *cf,
+static char *ngx_http_request_cookie_filter(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
-static char *ngx_http_response_cookie_filter_conf(ngx_conf_t *cf,
+static char *ngx_http_response_cookie_filter(ngx_conf_t *cf,
     ngx_command_t *cmd, void *conf);
 
 
 static ngx_command_t ngx_http_cookie_filter_commands[] = {
 
-    { ngx_string("request_cookie_filter"),
+    { ngx_string("set_request_cookie"),
       NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
-      ngx_http_request_cookie_filter_conf,
+      ngx_http_request_cookie_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
-    { ngx_string("response_cookie_filter"),
+    { ngx_string("add_request_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      ngx_http_request_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("modify_request_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      ngx_http_request_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("clear_request_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      ngx_http_request_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("set_response_cookie"),
       NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
-      ngx_http_response_cookie_filter_conf,
+      ngx_http_response_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("add_response_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
+      ngx_http_response_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("modify_response_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
+      ngx_http_response_cookie_filter,
+      NGX_HTTP_LOC_CONF_OFFSET,
+      0,
+      NULL },
+
+    { ngx_string("clear_response_cookie"),
+      NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
+      ngx_http_response_cookie_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
@@ -150,7 +192,7 @@ static ngx_http_output_header_filter_pt  ngx_http_next_header_filter;
 static ngx_int_t
 ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
 {
-    ngx_http_cookie_filter_loc_conf_t  *cfcf;
+    ngx_http_cookie_filter_loc_conf_t  *clcf;
     ngx_array_t                        *cookies;
     ngx_http_cookie_kv_t               *cookie_kv;
     ngx_http_cookie_filter_req_rule_t  *rule;
@@ -160,9 +202,9 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
     size_t                              len;
     ngx_uint_t                          found;
 
-    cfcf = ngx_http_get_module_loc_conf(r, ngx_http_cookie_filter_module);
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_cookie_filter_module);
 
-    if (cfcf->req_rules == NULL || cfcf->req_rules->nelts == 0) {
+    if (clcf->req_rules == NULL || clcf->req_rules->nelts == 0) {
         return NGX_DECLINED;
     }
 
@@ -206,8 +248,8 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
     }
 
     /* 2. Apply rules */
-    rule = cfcf->req_rules->elts;
-    for (i = 0; i < cfcf->req_rules->nelts; i++) {
+    rule = clcf->req_rules->elts;
+    for (i = 0; i < clcf->req_rules->nelts; i++) {
         found = 0;
         cookie_kv = cookies->elts;
         for (j = 0; j < cookies->nelts; j++) {
@@ -321,6 +363,74 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
 }
 
 
+/* 
+ * Parse Cookie header, copy from ngx_http_proxy_module
+ */
+static ngx_int_t
+ngx_http_cookie_filter_parse_cookie(ngx_str_t *value, ngx_array_t *attrs)
+{
+    u_char        *start, *end, *p, *last;
+    ngx_str_t      name, val;
+    ngx_keyval_t  *attr;
+
+    start = value->data;
+    end = value->data + value->len;
+
+    for ( ;; ) {
+
+        last = (u_char *) ngx_strchr(start, ';');
+
+        if (last == NULL) {
+            last = end;
+        }
+
+        while (start < last && *start == ' ') { start++; }
+
+        for (p = start; p < last && *p != '='; p++) { /* void */ }
+
+        name.data = start;
+        name.len = p - start;
+
+        while (name.len && name.data[name.len - 1] == ' ') {
+            name.len--;
+        }
+
+        if (p < last) {
+
+            p++;
+
+            while (p < last && *p == ' ') { p++; }
+
+            val.data = p;
+            val.len = last - val.data;
+
+            while (val.len && val.data[val.len - 1] == ' ') {
+                val.len--;
+            }
+
+        } else {
+            ngx_str_null(&val);
+        }
+
+        attr = ngx_array_push(attrs);
+        if (attr == NULL) {
+            return NGX_ERROR;
+        }
+
+        attr->key = name;
+        attr->value = val;
+
+        if (last == end) {
+            break;
+        }
+
+        start = last + 1;
+    }
+
+    return NGX_OK;
+}
+
+
 static ngx_int_t
 ngx_http_cookie_filter_header_filter(ngx_http_request_t *r)
 {
@@ -333,49 +443,54 @@ ngx_http_cookie_filter_header_filter(ngx_http_request_t *r)
 static char *
 ngx_http_request_cookie_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_cookie_filter_loc_conf_t *cfcf = conf;
+    ngx_http_cookie_filter_loc_conf_t *clcf = conf;
     ngx_str_t                         *value;
     ngx_http_cookie_filter_req_rule_t *rule;
     ngx_http_script_compile_t          sc;
 
     value = cf->args->elts;
 
-    if (cfcf->req_rules == NULL) {
-        cfcf->req_rules = ngx_array_create(cf->pool, 4, sizeof(ngx_http_cookie_filter_req_rule_t));
-        if (cfcf->req_rules == NULL) {
+    if (clcf->req_rules == NULL) {
+        clcf->req_rules = ngx_array_create(cf->pool, 4, sizeof(ngx_http_cookie_filter_req_rule_t));
+        if (clcf->req_rules == NULL) {
             return NGX_CONF_ERROR;
         }
     }
 
-    rule = ngx_array_push(cfcf->req_rules);
+    rule = ngx_array_push(clcf->req_rules);
     if (rule == NULL) {
         return NGX_CONF_ERROR;
     }
+
     ngx_memzero(rule, sizeof(ngx_http_cookie_filter_req_rule_t));
 
     /* Parse operation type */
-    if (ngx_strcasecmp(value.data, (u_char *) "add") == 0) {
+    if (value[0].data[0] == 'a') {
         rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_ADD;
-    } else if (ngx_strcasecmp(value.data, (u_char *) "set") == 0) {
+
+    } else if (value[0].data[0] == 's') {
         rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_SET;
-    } else if (ngx_strcasecmp(value.data, (u_char *) "modify") == 0) {
+
+    } else if (value[0].data[0] == 'm') {
         rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_MODIFY;
-    } else if (ngx_strcasecmp(value.data, (u_char *) "clear") == 0) {
+
+    } else if (value[0].data[0] == 'c') {
         rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_CLEAR;
-    } else {
-        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "invalid action \"%V\" in \"%V\" directive", &value, &cmd->name);
-        return NGX_CONF_ERROR;
     }
 
     /* Parse cookie name */
-    rule->name = value;
+    rule->name = value[1];
 
     /* Parse and compile value if it exists */
-    if (cf->args->nelts == 4) {
+    if (cf->args->nelts == 3) {
+
         if (rule->op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
-            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "\"clear\" action does not take a value");
+            ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "\"%V\" should not "
+                                                     "take a value",
+                                                     &value[0]);
             return NGX_CONF_ERROR;
         }
+
         ngx_memzero(&sc, sizeof(ngx_http_script_compile_t));
         sc.cf = cf;
         sc.source = &value;
@@ -388,8 +503,10 @@ ngx_http_request_cookie_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         if (ngx_http_script_compile(&sc)!= NGX_OK) {
             return NGX_CONF_ERROR;
         }
+
     } else {
-         if (rule->op_type!= NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
+
+         if (rule->op_type != NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "action \"%V\" requires a value", &value);
             return NGX_CONF_ERROR;
         }
