@@ -204,6 +204,10 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
     ngx_uint_t                          req_no_cookie;
     ngx_table_elt_t                    *h;
 
+    if (r->headers_out.status == 400 || r->headers_in.headers.last == NULL) {
+        return NGX_DECLINED;
+    }
+
     clcf = ngx_http_get_module_loc_conf(r, ngx_http_cookie_filter_module);
 
     if (clcf->req_rules == NULL || clcf->req_rules->nelts == 0) {
@@ -216,12 +220,15 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
         return NGX_ERROR;
     }
 
-    if (r->headers_in.cookie == NULL) {
-        req_no_cookie = 1;
+    h = r->headers_in.cookie;
+    if (h != NULL) {
 
-    } else {
+        for ( /* void */ ; h; h = h->next) {
 
-        for (h = r->headers_in.cookie; h; h = h->next) {
+            if (h->hash == 0) {
+                continue;
+            }
+
             start = h->value.data;
             end = h->value.data + h->value.len;
 
@@ -338,15 +345,18 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
     len = 0;
     cookie = cookies->elts;
     for (i = 0; i < cookies->nelts; i++) {
+
         if (!cookie[i].deleted) {
             len += cookie[i].name.len + 1 + cookie[i].value.len + 2; /* name=value;  */
         }
     }
 
     if (len == 0) {
+
         if (r->headers_in.cookie) {
-            r->headers_in.cookie->hash = 0;
+            r->headers_in.cookie = NULL;
         }
+
         return NGX_DECLINED;
     }
 
@@ -360,35 +370,42 @@ ngx_http_cookie_filter_request_handler(ngx_http_request_t *r)
     found = 0;
     for (i = 0; i < cookies->nelts; i++) {
         if (!cookie[i].deleted) {
-            if (found) {
-                *p++ = ';';
-                *p++ = ' ';
-            }
-            p = ngx_copy(p, cookie[i].name.data, cookie[i].name.len);
-            *p++ = '=';
-            p = ngx_copy(p, cookie[i].value.data, cookie[i].value.len);
-            found = 1;
+            continue;
         }
+
+        if (found) {
+            *p++ = ';';
+            *p++ = ' ';
+        }
+
+        p = ngx_copy(p, cookie[i].name.data, cookie[i].name.len);
+        *p++ = '=';
+        p = ngx_copy(p, cookie[i].value.data, cookie[i].value.len);
+
+        found = 1;
     }
-    
+
     new_cookie_header.len = len;
     new_cookie_header.data = buf;
 
     /* 4. Set new Cookie header */
-    ngx_table_elt_t *h = r->headers_in.cookie;
-    if (h == NULL) {
-        h = ngx_list_push(&r->headers_in.headers);
-        if (h == NULL) {
-            return NGX_ERROR;
-        }
-        r->headers_in.cookie = h;
+    if (r->headers_in.cookie) {
+        r->headers_in.cookie = NULL;
     }
-    
+
+    h = = ngx_palloc(r->pool, sizeof(ngx_table_elt_t));
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+
     h->key.len = sizeof("Cookie") - 1;
     h->key.data = (u_char *) "Cookie";
     h->value = new_cookie_header;
     h->hash = ngx_hash_key_lc(h->key.data, h->key.len);
-    
+    h->next = NULL;
+
+    r->headers_in.cookie = h;
+
     return NGX_DECLINED;
 }
 
