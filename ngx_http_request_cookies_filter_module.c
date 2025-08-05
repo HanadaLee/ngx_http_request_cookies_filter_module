@@ -23,6 +23,8 @@ typedef struct {
     ngx_uint_t                  op_type; /* ngx_http_request_cookies_filter_op_e */
     ngx_str_t                   name;
     ngx_http_complex_value_t   *value;
+    ngx_http_complex_value_t   *filter;
+    ngx_int_t                   negative;
 } ngx_http_request_cookies_filter_rule_t;
 
 
@@ -79,7 +81,7 @@ static ngx_command_t ngx_http_request_cookies_filter_commands[] = {
       NULL },
 
     { ngx_string("clear_request_cookie"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
+      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -302,6 +304,27 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     /* Apply rules */
     rule = clcf->rules->elts;
     for (i = 0; i < clcf->rules->nelts; i++) {
+
+        if (rule[i].filter) {
+
+            if (ngx_http_complex_value(r, rule[i].filter, &value) != NGX_OK) {
+                return NGX_ERROR;
+            }
+
+            if (value.len == 0 || (value.len == 1 && value.data[0] == '0')) {
+
+                if (!rule[i].negative) {
+                    continue;
+                }
+
+            } else {
+
+                if (rule[i].negative) {
+                    continue;
+                }
+            }
+        }
+
         found = 0;
         cookie = cookies->elts;
 
@@ -429,9 +452,11 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
     ngx_http_request_cookies_filter_loc_conf_t  *clcf = conf;
 
-    ngx_str_t                               *value;
+    ngx_str_t                                *value;
     ngx_http_request_cookies_filter_rule_t   *rule;
-    ngx_http_compile_complex_value_t         ccv;
+    ngx_uint_t                                n;
+    ngx_str_t                                 s;
+    ngx_http_compile_complex_value_t          ccv;
 
     value = cf->args->elts;
 
@@ -465,6 +490,12 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     if (rule->op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
+
+        if (cf->args->nelts == 3) {
+            n = 2;
+            goto if_filter;
+        }
+
         return NGX_CONF_OK;
     }
 
@@ -492,6 +523,45 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     rule->value = ccv.complex_value;
+
+    if (cf->args->nelts == 3) {
+        return NGX_CONF_OK;
+    }
+
+    n = 3;
+
+if_filter:
+
+    if (ngx_strncmp(value[n].data, "if=", 3) == 0) {
+        s.len = value[n].len - 3;
+        s.data = value[n].data + 3;
+        rule->negative = 0;
+
+    } else if (ngx_strncmp(value[n].data, "if!=", 4) == 0) {
+        s.len = value[n].len - 4;
+        s.data = value[n].data + 4;
+        rule->negative = 1;
+
+    } else {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+            "invalid parameter \"%V\"", &value[n]);
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memzero(&ccv, sizeof(ngx_http_compile_complex_value_t));
+
+    ccv.cf = cf;
+    ccv.value = &s;
+    ccv.complex_value = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+    if (ccv.complex_value == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    if (ngx_http_compile_complex_value(&ccv) != NGX_OK) {
+        return NGX_CONF_ERROR;
+    }
+
+    rule->filter = ccv.complex_value;
 
     return NGX_CONF_OK;
 }
