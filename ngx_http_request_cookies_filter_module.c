@@ -38,7 +38,7 @@ typedef struct {
 typedef struct {
     ngx_str_t                   name;
     ngx_str_t                   value;
-    ngx_uint_t                  deleted;
+    ngx_uint_t                  cleared;
 } ngx_http_request_cookie_t;
 
 
@@ -294,7 +294,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
                 cookie->name = name;
                 cookie->value = value;
-                cookie->deleted = 0;
+                cookie->cleared = 0;
 
                 start = last;
             }
@@ -342,7 +342,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
         if (found) {
 
             if (rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
-                cookie[j].deleted = 1;
+                cookie[j].cleared = 1;
                 filtered = 1;
 
                 continue;
@@ -381,7 +381,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
             cookie->name = rule[i].name;
             cookie->value = value;
-            cookie->deleted = 0;
+            cookie->cleared = 0;
             filtered = 1;
         }
     }
@@ -395,7 +395,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     cookie = cookies->elts;
     for (i = 0; i < cookies->nelts; i++) {
 
-        if (cookie[i].deleted) {
+        if (cookie[i].cleared == 1) {
             continue;
         }
 
@@ -419,7 +419,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     found = 0;
     for (i = 0; i < cookies->nelts; i++) {
 
-        if (cookie[i].deleted) {
+        if (cookie[i].cleared == 1) {
             continue;
         }
 
