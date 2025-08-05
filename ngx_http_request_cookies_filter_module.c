@@ -231,7 +231,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     ngx_uint_t                               i, j;
     ngx_str_t                                name, value;
     u_char                                  *p, *start, *end, *last;
-    ngx_uint_t                               found, filtered, cookies_count;
+    ngx_uint_t                               found, filtered;
 
     clcf = ngx_http_get_module_loc_conf(r,
         ngx_http_request_cookies_filter_module);
@@ -301,12 +301,11 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
     /* Apply rules */
     rule = clcf->rules->elts;
-    cookies_count = cookies->nelts;
     for (i = 0; i < clcf->rules->nelts; i++) {
         found = 0;
         cookie = cookies->elts;
 
-        for (j = 0; j < cookies_count; j++) {
+        for (j = 0; j < cookies->nelts; j++) {
 
             if (cookie[j].name.len == rule[i].name.len
                 && ngx_strncmp(cookie[j].name.data, rule[i].name.data,
