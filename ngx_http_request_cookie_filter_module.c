@@ -41,7 +41,10 @@ typedef struct {
 
 
 static ngx_int_t ngx_http_request_cookies_filter_add_variables(ngx_conf_t *cf);
+
 static ngx_int_t ngx_http_filtered_request_cookies_variable(
+    ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_fallback_request_cookies_variable(
     ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 
 static void *ngx_http_request_cookies_filter_create_loc_conf(ngx_conf_t *cf);
@@ -137,6 +140,78 @@ ngx_http_request_cookies_filter_add_variables(ngx_conf_t *cf)
 
         var->get_handler = v->get_handler;
         var->data = v->data;
+    }
+
+    return NGX_OK;
+}
+
+
+/*
+ * Copy from ngx_http_variable_cookies and ngx_http_variable_headers_internal
+ * Used to generate the same value as $http_cookie when cookies filter
+ * is not needed
+ */
+static ngx_int_t
+ngx_http_fallback_request_cookies_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data)
+{
+    size_t            len;
+    u_char           *p, *end;
+    ngx_table_elt_t  *h, *th;
+
+    h = r->headers_in.cookie;
+
+    len = 0;
+
+    for (th = h; th; th = th->next) {
+
+        if (th->hash == 0) {
+            continue;
+        }
+
+        len += th->value.len + 2;  // 2 for "; " separator
+    }
+
+    if (len == 0) {
+        v->not_filtered = 1;
+        return NGX_OK;
+    }
+
+    len -= 2;  // Remove trailing separator
+
+    v->valid = 1;
+    v->no_cacheable = 0;
+    v->not_filtered = 0;
+
+    if (h->next == NULL) {
+        v->len = h->value.len;
+        v->data = h->value.data;
+
+        return NGX_OK;
+    }
+
+    p = ngx_pnalloc(r->pool, len);
+    if (p == NULL) {
+        return NGX_ERROR;
+    }
+
+    v->len = len;
+    v->data = p;
+
+    end = p + len;
+
+    for (th = h; th; th = th->next) {
+        if (th->hash == 0) {
+            continue;
+        }
+
+        p = ngx_copy(p, th->value.data, th->value.len);
+
+        if (p == end) {
+            break;
+        }
+
+        *p++ = ';'; *p++ = ' ';
     }
 
     return NGX_OK;
@@ -346,148 +421,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 not_filtered:
 
     /* fallback to $http_cookie */
-    return ngx_http_request_cookie_filter_fallback(r, v, data);
-}
-
-
-/*
- * Copy from ngx_http_variable_cookies and ngx_http_variable_headers_internal
- * Used to generate the same value as $http_cookie when cookies filter
- * is not needed
- */
-static ngx_int_t
-ngx_http_request_cookie_filter_fallback(ngx_http_request_t *r,
-    ngx_http_variable_value_t *v, uintptr_t data)
-{
-    size_t            len;
-    u_char           *p, *end;
-    ngx_table_elt_t  *h, *th;
-
-    h = r->headers_in.cookie;
-
-    len = 0;
-
-    for (th = h; th; th = th->next) {
-
-        if (th->hash == 0) {
-            continue;
-        }
-
-        len += th->value.len + 2;  // 2 for "; " separator
-    }
-
-    if (len == 0) {
-        v->not_filtered = 1;
-        return NGX_OK;
-    }
-
-    len -= 2;  // Remove trailing separator
-
-    v->valid = 1;
-    v->no_cacheable = 0;
-    v->not_filtered = 0;
-
-    if (h->next == NULL) {
-        v->len = h->value.len;
-        v->data = h->value.data;
-
-        return NGX_OK;
-    }
-
-    p = ngx_pnalloc(r->pool, len);
-    if (p == NULL) {
-        return NGX_ERROR;
-    }
-
-    v->len = len;
-    v->data = p;
-
-    end = p + len;
-
-    for (th = h; th; th = th->next) {
-        if (th->hash == 0) {
-            continue;
-        }
-
-        p = ngx_copy(p, th->value.data, th->value.len);
-
-        if (p == end) {
-            break;
-        }
-
-        *p++ = ';'; *p++ = ' ';
-    }
-
-    return NGX_OK;
-}
-
-
-/*
- * Parse Cookie header, copy from ngx_http_proxy_module
- */
-static ngx_int_t
-ngx_http_request_cookies_filter_parse_cookie(ngx_str_t *value,
-    ngx_array_t *attrs)
-{
-    u_char        *start, *end, *p, *last;
-    ngx_str_t      name, val;
-    ngx_keyval_t  *attr;
-
-    start = value->data;
-    end = value->data + value->len;
-
-    for ( ;; ) {
-
-        last = (u_char *) ngx_strchr(start, ';');
-
-        if (last == NULL) {
-            last = end;
-        }
-
-        while (start < last && *start == ' ') { start++; }
-
-        for (p = start; p < last && *p != '='; p++) { /* void */ }
-
-        name.data = start;
-        name.len = p - start;
-
-        while (name.len && name.data[name.len - 1] == ' ') {
-            name.len--;
-        }
-
-        if (p < last) {
-
-            p++;
-
-            while (p < last && *p == ' ') { p++; }
-
-            val.data = p;
-            val.len = last - val.data;
-
-            while (val.len && val.data[val.len - 1] == ' ') {
-                val.len--;
-            }
-
-        } else {
-            ngx_str_null(&val);
-        }
-
-        attr = ngx_array_push(attrs);
-        if (attr == NULL) {
-            return NGX_ERROR;
-        }
-
-        attr->key = name;
-        attr->value = val;
-
-        if (last == end) {
-            break;
-        }
-
-        start = last + 1;
-    }
-
-    return NGX_OK;
+    return ngx_http_fallback_request_cookies_variable(r, v, data);
 }
 
 
