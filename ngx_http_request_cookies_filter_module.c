@@ -611,9 +611,9 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_request_cookies_filter_loc_conf_t *prev = parent;
     ngx_http_request_cookies_filter_loc_conf_t *conf = child;
 
-    ngx_array_t                             *merged_rules;
-    ngx_http_request_cookies_filter_rule_t  *prule, *crule;
+    ngx_http_request_cookies_filter_rule_t  *prule, *crule, *nrule;
     ngx_uint_t                               i, j, found;
+    ngx_uint_t                               crules_nelts;
 
     if (conf->rules == NGX_CONF_UNSET_PTR) {
         conf->rules = (prev->rules == NGX_CONF_UNSET_PTR) ? NULL : prev->rules;
@@ -624,25 +624,13 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
-    merged_rules =
-        ngx_array_create(cf->pool, conf->rules->nelts + prev->rules->nelts,
-                         sizeof(ngx_http_request_cookies_filter_rule_t));
-
-    if (merged_rules == NULL) {
-        return NGX_CONF_ERROR;
-    }
-
-    ngx_memcpy(ngx_array_push_n(merged_rules, conf->rules->nelts),
-               conf->rules->elts,
-               conf->rules->nelts
-                   * sizeof(ngx_http_request_cookies_filter_rule_t));
-
     prule = prev->rules->elts;
+    crules_nelts = conf->rules->nelts;
     for (i = 0; i < prev->rules->nelts; i++) {
+        crule = conf->rules->elts;
         found = 0;
-        crule = merged_rules->elts;
 
-        for (j = 0; j < merged_rules->nelts; j++) {
+        for (j = 0; j < crules_nelts; j++) {
             if (prule[i].name.len == crule[j].name.len
                 && ngx_strncmp(prule[i].name.data, crule[j].name.data,
                             prule[i].name.len) == 0)
@@ -652,19 +640,15 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
             }
         }
 
-        if (found) {
-            continue;
-        }
+        if (!found) {
+            nrule = ngx_array_push(conf->rules);
+            if (nrule == NULL) {
+                return NGX_CONF_ERROR;
+            }
 
-        crule = ngx_array_push(merged_rules);
-        if (crule == NULL) {
-            return NGX_CONF_ERROR;
+            *nrule = prule[i];
         }
-
-        *crule = prule[i];
     }
-
-    conf->rules = merged_rules;
 
     return NGX_CONF_OK;
 }
