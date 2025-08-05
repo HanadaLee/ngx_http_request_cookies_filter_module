@@ -475,7 +475,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (clcf->rules == NULL) {
+    if (clcf->rules == NGX_CONF_UNSET_PTR) {
         clcf->rules = ngx_array_create(cf->pool, 4,
             sizeof(ngx_http_request_cookies_filter_rule_t));
         if (clcf->rules == NULL) {
@@ -598,6 +598,8 @@ ngx_http_request_cookies_filter_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
+    conf->rules = NGX_CONF_UNSET_PTR;
+
     return conf;
 }
 
@@ -610,16 +612,15 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_request_cookies_filter_loc_conf_t *conf = child;
 
     ngx_array_t                             *merged_rules;
-    ngx_http_request_cookies_filter_rule_t  *prev_rule, *curr_rule;
+    ngx_http_request_cookies_filter_rule_t  *prule, *crule;
     ngx_uint_t                               i, j, found;
 
-    if (conf->rules == NULL) {
-        conf->rules = prev->rules;
-
+    if (conf->rules == NGX_CONF_UNSET_PTR) {
+        conf->rules = (prev->rules == NGX_CONF_UNSET_PTR) ? NULL : prev->rules;
         return NGX_CONF_OK;
     }
 
-    if (prev->rules == NULL || prev->rules->nelts == 0) {
+    if (prev->rules == NGX_CONF_UNSET_PTR || prev->rules == NULL) {
         return NGX_CONF_OK;
     }
 
@@ -636,15 +637,15 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
                conf->rules->nelts
                    * sizeof(ngx_http_request_cookies_filter_rule_t));
 
-    prev_rule = prev->rules->elts;
+    prule = prev->rules->elts;
     for (i = 0; i < prev->rules->nelts; i++) {
         found = 0;
-        curr_rule = merged_rules->elts;
+        crule = merged_rules->elts;
 
         for (j = 0; j < merged_rules->nelts; j++) {
-            if (prev_rule[i].name.len == curr_rule[j].name.len
-                && ngx_strncmp(prev_rule[i].name.data, curr_rule[j].name.data,
-                            prev_rule[i].name.len) == 0)
+            if (prule[i].name.len == crule[j].name.len
+                && ngx_strncmp(prule[i].name.data, crule[j].name.data,
+                            prule[i].name.len) == 0)
             {
                 found = 1;
                 break;
@@ -655,12 +656,12 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
             continue;
         }
 
-        curr_rule = ngx_array_push(merged_rules);
-        if (curr_rule == NULL) {
+        crule = ngx_array_push(merged_rules);
+        if (crule == NULL) {
             return NGX_CONF_ERROR;
         }
 
-        *curr_rule = prev_rule[i];
+        *crule = prule[i];
     }
 
     conf->rules = merged_rules;
