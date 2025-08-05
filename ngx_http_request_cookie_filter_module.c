@@ -152,12 +152,11 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     ngx_array_t                             *cookies;
     ngx_http_request_cookie_t               *cookie;
     ngx_http_request_cookies_filter_rule_t  *rule;
+    ngx_table_elt_t                         *h;
     ngx_uint_t                               i, j;
     ngx_str_t                                value;
-    u_char                                  *p, *buf;
-    size_t                                   len;
+    u_char                                  *p;
     ngx_uint_t                               found, filtered, cookies_count;
-    ngx_table_elt_t                         *h;
 
     clcf = ngx_http_get_module_loc_conf(r,
         ngx_http_request_cookies_filter_module);
