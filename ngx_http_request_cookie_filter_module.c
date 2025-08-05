@@ -173,7 +173,7 @@ ngx_http_fallback_request_cookies_variable(ngx_http_request_t *r,
     }
 
     if (len == 0) {
-        v->not_filtered = 1;
+        v->not_found = 1;
         return NGX_OK;
     }
 
@@ -181,7 +181,7 @@ ngx_http_fallback_request_cookies_variable(ngx_http_request_t *r,
 
     v->valid = 1;
     v->no_cacheable = 0;
-    v->not_filtered = 0;
+    v->not_found = 0;
 
     if (h->next == NULL) {
         v->len = h->value.len;
@@ -229,8 +229,8 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     ngx_http_request_cookies_filter_rule_t  *rule;
     ngx_table_elt_t                         *h;
     ngx_uint_t                               i, j;
-    ngx_str_t                                value;
-    u_char                                  *p;
+    ngx_str_t                                name, value;
+    u_char                                  *p, *start, *end, *last;
     ngx_uint_t                               found, filtered, cookies_count;
 
     clcf = ngx_http_get_module_loc_conf(r,
@@ -330,7 +330,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                 || rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_SET)
             {
 
-                if (ngx_http_complex_value(r, &rule[i].value, &value)
+                if (ngx_http_complex_value(r, rule[i].value, &value)
                         != NGX_OK)
                 {
                     return NGX_ERROR;
@@ -351,7 +351,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
 
-            if (ngx_http_complex_value(r, &rule[i].value, &value)
+            if (ngx_http_complex_value(r, rule[i].value, &value)
                     != NGX_OK)
             {
                 return NGX_ERROR;
@@ -414,7 +414,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
     v->valid = 1;
     v->no_cacheable = 0;
-    v->not_filtered = 0;
+    v->not_found = 0;
 
     return NGX_OK;
 
