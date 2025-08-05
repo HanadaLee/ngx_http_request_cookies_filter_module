@@ -609,20 +609,61 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_request_cookies_filter_loc_conf_t *prev = parent;
     ngx_http_request_cookies_filter_loc_conf_t *conf = child;
 
-    ngx_http_request_cookie_t   *cookie;
+    ngx_array_t                             *merged_rules;
+    ngx_http_request_cookies_filter_rule_t  *prev_rule, *curr_rule;
+    ngx_uint_t                               i, j, found;
 
     if (conf->rules == NULL) {
         conf->rules = prev->rules;
 
-    } else if (prev->rules != NULL) {
-        cookie = ngx_array_push_n(conf->rules, prev->rules->nelts);
-        if (cookie == NULL) {
+        return NGX_CONF_OK;
+    }
+
+    if (prev->rules == NULL || prev->rules->nelts == 0) {
+        return NGX_CONF_OK;
+    }
+
+    merged_rules =
+        ngx_array_create(cf->pool, conf->rules->nelts + prev->rules->nelts,
+                         sizeof(ngx_http_request_cookies_filter_rule_t));
+
+    if (merged_rules == NULL) {
+        return NGX_CONF_ERROR;
+    }
+
+    ngx_memcpy(ngx_array_push_n(merged_rules, conf->rules->nelts),
+               conf->rules->elts,
+               conf->rules->nelts
+                   * sizeof(ngx_http_request_cookies_filter_rule_t));
+
+    prev_rule = prev->rules->elts;
+    for (i = 0; i < prev->rules->nelts; i++) {
+        found = 0;
+        curr_rule = merged_rules->elts;
+
+        for (j = 0; j < merged_rules->nelts; j++) {
+            if (prev_rule[i].name.len == curr_rule[j].name.len
+                && ngx_strncmp(prev_rule[i].name.data, curr_rule[j].name.data,
+                            prev_rule[i].name.len) == 0)
+            {
+                found = 1;
+                break;
+            }
+        }
+
+        if (found) {
+            continue;
+        }
+
+        curr_rule = ngx_array_push(merged_rules);
+        if (curr_rule == NULL) {
             return NGX_CONF_ERROR;
         }
 
-        ngx_memcpy(cookie, prev->rules->elts,
-                   prev->rules->nelts * sizeof(ngx_http_request_cookie_t));
+        *curr_rule = prev_rule[i];
     }
+
+    conf->rules = merged_rules;
 
     return NGX_CONF_OK;
 }
