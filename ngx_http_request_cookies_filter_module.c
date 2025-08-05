@@ -390,6 +390,10 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                 return NGX_ERROR;
             }
 
+            if (value.len == 0) {
+                continue;
+            }
+
             cookie->name = rule[i].name;
             cookie->value = value;
             cookie->cleared = 0;
@@ -500,6 +504,14 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_CLEAR;
     }
 
+    /* Parse cookie name */
+    rule->name = value[1];
+    if (rule->name.len == 0) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
+                           "cookie name is empty");
+        return NGX_CONF_ERROR;
+    }
+
     if (rule->op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
 
         if (cf->args->nelts == 3) {
@@ -509,9 +521,6 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
         return NGX_CONF_OK;
     }
-
-    /* Parse cookie name */
-    rule->name = value[1];
 
     /* Parse and compile value */
     if (cf->args->nelts != 3) {
