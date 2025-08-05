@@ -60,28 +60,28 @@ static char *ngx_http_request_cookies_filter(ngx_conf_t *cf,
 static ngx_command_t ngx_http_request_cookies_filter_commands[] = {
 
     { ngx_string("set_request_cookie"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("add_request_cookie"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("modify_request_cookie"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
     { ngx_string("clear_request_cookie"),
-      NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
+      NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE12,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
@@ -330,6 +330,10 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
         for (j = 0; j < cookies->nelts; j++) {
 
+            if (cookie[j].cleared == 1) {
+                continue;
+            }
+
             if (cookie[j].name.len == rule[i].name.len
                 && ngx_strncmp(cookie[j].name.data, rule[i].name.data,
                                rule[i].name.len) == 0)
@@ -356,6 +360,13 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                         != NGX_OK)
                 {
                     return NGX_ERROR;
+                }
+
+                if (value.len == 0) {
+                    cookie[j].cleared = 1;
+                    filtered = 1;
+
+                    continue;
                 }
 
                 cookie[j].value = value;
