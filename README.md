@@ -3,6 +3,8 @@
 # Name
 ngx_http_request_cookies_filter_module
 
+A NGINX module for fine-grained request cookies control.
+
 # Table of Content
 
 - [ngx\_http\_request\_cookies\_filter\_module](#ngx_http_request_cookies_filter_module)
@@ -12,12 +14,12 @@ ngx_http_request_cookies_filter_module
 - [Synopsis](#synopsis)
 - [Installation](#installation)
 - [Directives](#directives)
-	- [set\_request\_cookie](#set_request_cookie)
-	- [add\_request\_cookie](#add_request_cookie)
-	- [modify\_request\_cookie](#modify_request_cookie)
-	- [clear\_request\_cookie](#clear_request_cookie)
+  - [set\_request\_cookie](#set_request_cookie)
+  - [add\_request\_cookie](#add_request_cookie)
+  - [modify\_request\_cookie](#modify_request_cookie)
+  - [clear\_request\_cookie](#clear_request_cookie)
 - [Variables](#variables)
-	- [$filtered\_request\_cookies](#filtered_request_cookies)
+  - [$filtered\_request\_cookies](#filtered_request_cookies)
 - [Author](#author)
 - [License](#license)
 
@@ -29,32 +31,32 @@ This Nginx module is currently considered experimental. Issues and PRs are welco
 
 ```nginx
 http {
-	server {
-		listen 80;
-		server_name example.com;
+    server {
+        listen 80;
+        server_name example.com;
 
-		location / {
-			# If a cookie named "a" exists, set it to 1. Otherwise, add a cookie named "a" with value 1.
-			set_request_cookie a 1;
+        location / {
+            # If a cookie named "a" exists, set it to 1. Otherwise, add a cookie named "a" with value 1.
+            set_request_cookie a 1;
 
-			# If a cookie named "b" exists, do nothing. Otherwise, add a cookie named "a" with value 1.
-			add_request_cookie b 2;
+            # If a cookie named "b" exists, do nothing. Otherwise, add a cookie named "a" with value 1.
+            add_request_cookie b 2;
 
-			# If a cookie named "c" exists, set it to 3. Otherwise, do nothing.
-			modify_request_cookie c 3;
-	
-			# If a cookie named "d" exists, delete it. Otherwise, do nothing.
-			clear_request_cookie d;
+            # If a cookie named "c" exists, set it to 3. Otherwise, do nothing.
+            modify_request_cookie c 3;
+    
+            # If a cookie named "d" exists, delete it. Otherwise, do nothing.
+            clear_request_cookie d;
 
-			# Conditional filtering. Only effected if varialbe $http_a is not empty or '0'.
-			set_request_cookie e 4 if=$http_a;
+            # Conditional filtering. Only effected if varialbe $http_a is not empty or '0'.
+            set_request_cookie e 4 if=$http_a;
 
-			# Send the filtered cookies to upstream.
-			proxy_set_header Cookie $filtered_request_cookies;
+            # Send the filtered cookies to upstream.
+            proxy_set_header Cookie $filtered_request_cookies;
 
-			proxy_pass http://127.0.0.1:8080;
-		}
-	}
+            proxy_pass http://127.0.0.1:8080;
+        }
+    }
 }
 ```
 
