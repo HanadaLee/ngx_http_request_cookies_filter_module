@@ -609,8 +609,19 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_http_request_cookies_filter_loc_conf_t *prev = parent;
     ngx_http_request_cookies_filter_loc_conf_t *conf = child;
 
+    ngx_http_request_cookie_t   *cookie;
+
     if (conf->rules == NULL) {
         conf->rules = prev->rules;
+
+    } else if (prev->rules != NULL) {
+        cookie = ngx_array_push_n(conf->rules, prev->rules->nelts);
+        if (cookie == NULL) {
+            return NGX_CONF_ERROR;
+        }
+
+        ngx_memcpy(cookie, prev->rules->elts,
+                   prev->rules->nelts * sizeof(ngx_http_request_cookie_t));
     }
 
     return NGX_CONF_OK;
