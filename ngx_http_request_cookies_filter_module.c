@@ -338,9 +338,9 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
                 cookie[j].value = value;
                 filtered = 1;
-
-                continue;
             }
+
+            continue;
         }
 
         if (rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_ADD
