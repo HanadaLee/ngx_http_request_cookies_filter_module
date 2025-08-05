@@ -1,11 +1,11 @@
-# ngx_http_request_cookie_filter_module
+# ngx_http_request_cookies_filter_module
 
 # Name
-`ngx_http_request_cookie_filter_module`
+`ngx_http_request_cookies_filter_module`
 
 # Table of Content
 
-- [ngx\_http\_cookie\_filter\_module](#ngx_http_request_cookie_filter_module)
+- [ngx\_http\_cookie\_filter\_module](#ngx_http_request_cookies_filter_module)
 - [Name](#name)
 - [Table of Content](#table-of-content)
 - [Status](#status)
@@ -28,7 +28,7 @@ This Nginx module is currently considered experimental. Issues and PRs are welco
 
 # Installation
 
-To use theses modules, configure your nginx branch with `--add-module=/path/to/ngx_http_request_cookie_filter_module`.
+To use theses modules, configure your nginx branch with `--add-module=/path/to/ngx_http_request_cookies_filter_module`.
 
 # Directives
 
