@@ -11,10 +11,10 @@
 
 /* Operation types */
 typedef enum {
-    NGX_HTTP_COOKIE_FILTER_OP_ADD = 0,
-    NGX_HTTP_COOKIE_FILTER_OP_SET,
-    NGX_HTTP_COOKIE_FILTER_OP_MODIFY,
-    NGX_HTTP_COOKIE_FILTER_OP_CLEAR
+    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD = 0,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR
 } ngx_http_request_cookies_filter_op_e;
 
 
@@ -345,15 +345,15 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
         if (found) {
 
-            if (rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
+            if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR) {
                 cookie[j].cleared = 1;
                 filtered = 1;
 
                 continue;
             }
 
-            if (rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_MODIFY
-                || rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_SET)
+            if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY
+                || rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET)
             {
 
                 if (ngx_http_complex_value(r, rule[i].value, &value)
@@ -376,8 +376,8 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
             continue;
         }
 
-        if (rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_ADD
-            || rule[i].op_type == NGX_HTTP_COOKIE_FILTER_OP_SET)
+        if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD
+            || rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET)
         {
             cookie = ngx_array_push(cookies);
             if (cookie == NULL) {
@@ -492,16 +492,16 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Parse operation type */
     if (value[0].data[0] == 'a') {
-        rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_ADD;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD;
 
     } else if (value[0].data[0] == 's') {
-        rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_SET;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET;
 
     } else if (value[0].data[0] == 'm') {
-        rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_MODIFY;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY;
 
     } else if (value[0].data[0] == 'c') {
-        rule->op_type = NGX_HTTP_COOKIE_FILTER_OP_CLEAR;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR;
     }
 
     /* Parse cookie name */
@@ -512,7 +512,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (rule->op_type == NGX_HTTP_COOKIE_FILTER_OP_CLEAR) {
+    if (rule->op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR) {
 
         if (cf->args->nelts == 3) {
             n = 2;
