@@ -11,10 +11,10 @@
 
 /* Operation types */
 typedef enum {
-    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD = 0,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR
+    NGX_HTTP_REQUEST_COOKIES_FILTER_ADD = 0,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_SET,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR
 } ngx_http_request_cookies_filter_op_e;
 
 
@@ -233,7 +233,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     ngx_uint_t                               i, j;
     ngx_str_t                                name, value;
     u_char                                  *p, *start, *end, *last;
-    ngx_uint_t                               found, filtered;
+    ngx_uint_t                               found, op_type, filtered;
 
     clcf = ngx_http_get_module_loc_conf(r,
         ngx_http_request_cookies_filter_module);
@@ -326,6 +326,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
         }
 
         found = 0;
+        op_type = rule[i].op_type;
         cookie = cookies->elts;
 
         for (j = 0; j < cookies->nelts; j++) {
@@ -339,45 +340,46 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                                rule[i].name.len) == 0)
             {
                 found = 1;
-                break;
-            }
-        }
 
-        if (found) {
-
-            if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR) {
-                cookie[j].cleared = 1;
-                filtered = 1;
-
-                continue;
-            }
-
-            if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY
-                || rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET)
-            {
-
-                if (ngx_http_complex_value(r, rule[i].value, &value)
-                        != NGX_OK)
-                {
-                    return NGX_ERROR;
-                }
-
-                if (value.len == 0) {
+                if (op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
                     cookie[j].cleared = 1;
                     filtered = 1;
 
                     continue;
                 }
+                
+                if (op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY
+                    || op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_SET)
+                {
 
-                cookie[j].value = value;
-                filtered = 1;
+                    if (ngx_http_complex_value(r, rule[i].value, &value)
+                            != NGX_OK)
+                    {
+                        return NGX_ERROR;
+                    }
+
+                    if (value.len == 0) {
+                        cookie[j].cleared = 1;
+                        filtered = 1;
+
+                        continue;
+                    }
+
+                    cookie[j].value = value;
+
+                    filtered = 1;
+                    /* clear multiple values */
+                    op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
+                }
             }
+        }
 
+        if (found) {
             continue;
         }
 
-        if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD
-            || rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET)
+        if (rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_ADD
+            || rule[i].op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_SET)
         {
             cookie = ngx_array_push(cookies);
             if (cookie == NULL) {
@@ -492,16 +494,16 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     /* Parse operation type */
     if (value[0].data[0] == 'a') {
-        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_ADD;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_ADD;
 
     } else if (value[0].data[0] == 's') {
-        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_SET;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_SET;
 
     } else if (value[0].data[0] == 'm') {
-        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_MODIFY;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY;
 
     } else if (value[0].data[0] == 'c') {
-        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR;
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
     }
 
     /* Parse cookie name */
@@ -512,7 +514,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    if (rule->op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_OP_CLEAR) {
+    if (rule->op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
 
         if (cf->args->nelts == 3) {
             n = 2;
