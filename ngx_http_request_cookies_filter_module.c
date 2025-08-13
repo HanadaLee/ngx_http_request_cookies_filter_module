@@ -336,8 +336,8 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
             }
 
             if (cookie[j].name.len == rule[i].name.len
-                && ngx_strncmp(cookie[j].name.data, rule[i].name.data,
-                               rule[i].name.len) == 0)
+                && ngx_strncasecmp(cookie[j].name.data, rule[i].name.data,
+                                   rule[i].name.len) == 0)
             {
                 found = 1;
 
@@ -634,7 +634,7 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
 
         for (j = 0; j < crules_nelts; j++) {
             if (prule[i].name.len == crule[j].name.len
-                && ngx_strncmp(prule[i].name.data, crule[j].name.data,
+                && ngx_strncasecmp(prule[i].name.data, crule[j].name.data,
                             prule[i].name.len) == 0)
             {
                 found = 1;
