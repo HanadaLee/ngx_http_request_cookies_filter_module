@@ -13,7 +13,7 @@
 typedef enum {
     NGX_HTTP_REQUEST_COOKIES_FILTER_ADD = 0,
     NGX_HTTP_REQUEST_COOKIES_FILTER_SET,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY,
+    NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE,
     NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR
 } ngx_http_request_cookies_filter_op_e;
 
@@ -73,7 +73,7 @@ static ngx_command_t ngx_http_request_cookies_filter_commands[] = {
       0,
       NULL },
 
-    { ngx_string("modify_request_cookie"),
+    { ngx_string("rewrite_request_cookie"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE23,
       ngx_http_request_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
@@ -348,7 +348,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                     continue;
                 }
                 
-                if (op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY
+                if (op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE
                     || op_type == NGX_HTTP_REQUEST_COOKIES_FILTER_SET)
                 {
 
@@ -499,8 +499,8 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     } else if (value[0].data[0] == 's') {
         rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_SET;
 
-    } else if (value[0].data[0] == 'm') {
-        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_MODIFY;
+    } else if (value[0].data[0] == 'r') {
+        rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE;
 
     } else if (value[0].data[0] == 'c') {
         rule->op_type = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
