@@ -9,9 +9,10 @@
 #include <ngx_http.h>
 
 
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF       0
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_BEFORE    1
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_AFTER     2
+#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF      0
+#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON       1
+#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_PREPEND  2
+#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_APPEND   3
 
 
 typedef enum {
@@ -66,6 +67,7 @@ static char *ngx_http_request_cookies_filter(ngx_conf_t *cf,
 
 
 static ngx_conf_enum_t  ngx_http_request_cookies_filter_inherit[] = {
+    { ngx_string("on"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON },
     { ngx_string("off"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF },
     { ngx_string("before"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_BEFORE },
     { ngx_string("after"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_AFTER },
@@ -863,7 +865,15 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_uint_t                               i;
 
     ngx_conf_merge_uint_value(conf->inherit_mode, prev->inherit_mode,
-                              NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF);
+                              NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON);
+
+    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF) {
+        if (conf->rules == NGX_CONF_UNSET_PTR) {
+            conf->rules = NULL;
+        }
+
+        return NGX_CONF_OK;
+    }
 
     if (conf->rules == NGX_CONF_UNSET_PTR) {
         conf->rules = (prev->rules == NGX_CONF_UNSET_PTR) ? NULL : prev->rules;
@@ -874,7 +884,7 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
-    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF) {
+    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON) {
         return NGX_CONF_OK;
     }
 
@@ -908,7 +918,7 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
             return NGX_CONF_ERROR;
         }
 
-        *nr = p_rule[i];
+        *nr = pr[i];
     }
 
     cr = conf->rules->elts;
@@ -918,7 +928,7 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
             return NGX_CONF_ERROR;
         }
 
-        *nr = c_rule[i];
+        *nr = cr[i];
     }
 
     conf->rules = new_rules;
