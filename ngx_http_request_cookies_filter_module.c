@@ -736,7 +736,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
         
-        if (rule->name.len == 1 && value[i].data[0] == '*') {
+        if (rule->name.len == 1 && rule->name.data[0] == '*') {
             rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL;
         }
 
