@@ -316,6 +316,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
     }
 
     parsed = 0;
+    cookies = NULL;
     rule = clcf->rules->elts;
 
     for (i = 0; i < clcf->rules->nelts; i++) {
