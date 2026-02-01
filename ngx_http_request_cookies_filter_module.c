@@ -662,15 +662,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE;
 
     } else if (value[1].data[0] == 'c' || value[1].data[0] == 'C') {
-
-        if (value[1].data[value[1].len - 1] == 'r'
-            || value[1].data[value[1].len - 1] == 'R')
-        {
-            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
-
-        } else {
-            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL;
-        }
+        rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
 
     } else if (value[1].data[0] == 'k' || value[1].data[0] == 'K') {
         rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_KEEP;
@@ -682,9 +674,6 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     i = 2;
-    if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL) {
-        goto parse_tail;
-    }
 
     if (value[i].len == 2 && ngx_strncmp(value[i].data, "-i", 2) == 0) {
         rule->ignore_case = 1;
@@ -743,6 +732,11 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     i++;
 
     if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
+        
+        if (rule->name.len == 1 && value[i].data[0] == '*') {
+            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL;
+        }
+
         goto parse_tail;
         return NGX_CONF_OK;
     }
