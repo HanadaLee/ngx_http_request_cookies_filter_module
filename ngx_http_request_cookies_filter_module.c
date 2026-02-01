@@ -743,7 +743,7 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     i++;
 
     if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
-        goto if_filter;
+        goto parse_tail;
         return NGX_CONF_OK;
     }
 
