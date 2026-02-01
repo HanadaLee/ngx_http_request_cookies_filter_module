@@ -9,25 +9,25 @@
 #include <ngx_http.h>
 
 
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF      0
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON       1
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_BEFORE   2
-#define NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_AFTER    3
+#define NGX_HTTP_COOKIES_FILTER_INHERIT_OFF      0
+#define NGX_HTTP_COOKIES_FILTER_INHERIT_ON       1
+#define NGX_HTTP_COOKIES_FILTER_INHERIT_BEFORE   2
+#define NGX_HTTP_COOKIES_FILTER_INHERIT_AFTER    3
 
 
 typedef enum {
-    NGX_HTTP_REQUEST_COOKIES_FILTER_ADD = 0,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_APPEND,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_SET,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL,
-    NGX_HTTP_REQUEST_COOKIES_FILTER_KEEP
-} ngx_http_request_cookies_filter_op_e;
+    NGX_HTTP_COOKIES_FILTER_ADD = 0,
+    NGX_HTTP_COOKIES_FILTER_APPEND,
+    NGX_HTTP_COOKIES_FILTER_SET,
+    NGX_HTTP_COOKIES_FILTER_REWRITE,
+    NGX_HTTP_COOKIES_FILTER_CLEAR,
+    NGX_HTTP_COOKIES_FILTER_CLEAR_ALL,
+    NGX_HTTP_COOKIES_FILTER_KEEP
+} ngx_http_cookies_filter_op_e;
 
 
 typedef struct {
-    ngx_uint_t                  op;         /* ngx_http_request_cookies_filter_op_e */
+    ngx_uint_t                  op;         /* ngx_http_cookies_filter_op_e */
     ngx_uint_t                  ignore_case;
     ngx_str_t                   name;
     ngx_array_t                *name_list;  /* array of ngx_str_t */
@@ -35,82 +35,82 @@ typedef struct {
     ngx_uint_t                  flag;
     ngx_http_complex_value_t   *filter;
     ngx_int_t                   negative;
-} ngx_http_request_cookies_filter_rule_t;
+} ngx_http_cookies_filter_rule_t;
 
 
 typedef struct {
-    ngx_array_t                *rules;      /* array of ngx_http_request_cookies_filter_rule_t */
+    ngx_array_t                *rules;      /* array of ngx_http_cookies_filter_rule_t */
     ngx_uint_t                  inherit_mode;
-} ngx_http_request_cookies_filter_loc_conf_t;
+} ngx_http_cookies_filter_loc_conf_t;
 
 
 typedef struct {
     ngx_str_t                   name;
     ngx_str_t                   value;
     ngx_uint_t                  cleared;
-} ngx_http_request_cookie_t;
+} ngx_http_cookie_t;
 
 
-static ngx_int_t ngx_http_request_cookies_filter_add_variables(ngx_conf_t *cf);
+static ngx_int_t ngx_http_cookies_filter_add_variables(ngx_conf_t *cf);
 
-static ngx_int_t ngx_http_filtered_request_cookies_variable(
+static ngx_int_t ngx_http_filtered_cookies_variable(ngx_http_request_t *r,
+    ngx_http_variable_value_t *v, uintptr_t data);
+static ngx_int_t ngx_http_cookies_filter_fallback_variable(
     ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
-static ngx_int_t ngx_http_request_cookies_filter_fallback_variable(
-    ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 
-static void *ngx_http_request_cookies_filter_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf,
+static void *ngx_http_cookies_filter_create_loc_conf(ngx_conf_t *cf);
+static char *ngx_http_cookies_filter_merge_loc_conf(ngx_conf_t *cf,
     void *parent, void *child);
 
-static char *ngx_http_request_cookies_filter(ngx_conf_t *cf,
-    ngx_command_t *cmd, void *conf);
+static char *ngx_http_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd,
+    void *conf);
 
 
-static ngx_conf_enum_t  ngx_http_request_cookies_filter_inherit[] = {
-    { ngx_string("on"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON },
-    { ngx_string("off"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF },
-    { ngx_string("before"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_BEFORE },
-    { ngx_string("after"), NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_AFTER },
+static ngx_conf_enum_t  ngx_http_cookies_filter_inherit[] = {
+    { ngx_string("on"), NGX_HTTP_COOKIES_FILTER_INHERIT_ON },
+    { ngx_string("off"), NGX_HTTP_COOKIES_FILTER_INHERIT_OFF },
+    { ngx_string("before"), NGX_HTTP_COOKIES_FILTER_INHERIT_BEFORE },
+    { ngx_string("after"), NGX_HTTP_COOKIES_FILTER_INHERIT_AFTER },
     { ngx_null_string, 0 }
 };
 
 
-static ngx_command_t ngx_http_request_cookies_filter_commands[] = {
+static ngx_command_t ngx_http_cookies_filter_commands[] = {
 
-    { ngx_string("request_cookies_filter"),
+    { ngx_string("cookies_filter"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_2MORE,
-      ngx_http_request_cookies_filter,
+      ngx_http_cookies_filter,
       NGX_HTTP_LOC_CONF_OFFSET,
       0,
       NULL },
 
-    { ngx_string("request_cookies_filter_inherit"),
+    { ngx_string("cookies_filter_inherit"),
       NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_enum_slot,
       NGX_HTTP_LOC_CONF_OFFSET,
-      offsetof(ngx_http_request_cookies_filter_loc_conf_t, inherit_mode),
-      &ngx_http_request_cookies_filter_inherit },
+      offsetof(ngx_http_cookies_filter_loc_conf_t, inherit_mode),
+      &ngx_http_cookies_filter_inherit },
 
       ngx_null_command
 };
 
 
-static ngx_http_module_t ngx_http_request_cookies_filter_module_ctx = {
-    ngx_http_request_cookies_filter_add_variables,    /* preconfiguration */
+static ngx_http_module_t ngx_http_cookies_filter_module_ctx = {
+    ngx_http_cookies_filter_add_variables,            /* preconfiguration */
     NULL,                                             /* postconfiguration */
     NULL,                                             /* create main configuration */
     NULL,                                             /* init main configuration */
     NULL,                                             /* create server configuration */
     NULL,                                             /* merge server configuration */
-    ngx_http_request_cookies_filter_create_loc_conf,  /* create location configuration */
-    ngx_http_request_cookies_filter_merge_loc_conf    /* merge location configuration */
+    ngx_http_cookies_filter_create_loc_conf,          /* create location configuration */
+    ngx_http_cookies_filter_merge_loc_conf            /* merge location configuration */
 };
 
 
-ngx_module_t ngx_http_request_cookies_filter_module = {
+ngx_module_t ngx_http_cookies_filter_module = {
     NGX_MODULE_V1,
-    &ngx_http_request_cookies_filter_module_ctx,      /* module context */
-    ngx_http_request_cookies_filter_commands,         /* module directives */
+    &ngx_http_cookies_filter_module_ctx,              /* module context */
+    ngx_http_cookies_filter_commands,                 /* module directives */
     NGX_HTTP_MODULE,                                  /* module type */
     NULL,                                             /* init master */
     NULL,                                             /* init module */
@@ -123,10 +123,10 @@ ngx_module_t ngx_http_request_cookies_filter_module = {
 };
 
 
-static ngx_http_variable_t  ngx_http_request_cookies_filter_vars[] = {
+static ngx_http_variable_t  ngx_http_cookies_filter_vars[] = {
 
-    { ngx_string("filtered_request_cookies"), NULL,
-      ngx_http_filtered_request_cookies_variable,
+    { ngx_string("filtered_cookies"), NULL,
+      ngx_http_filtered_cookies_variable,
       0, NGX_HTTP_VAR_NOCACHEABLE, 0 },
 
       ngx_http_null_variable
@@ -134,11 +134,11 @@ static ngx_http_variable_t  ngx_http_request_cookies_filter_vars[] = {
 
 
 static ngx_int_t
-ngx_http_request_cookies_filter_add_variables(ngx_conf_t *cf)
+ngx_http_cookies_filter_add_variables(ngx_conf_t *cf)
 {
     ngx_http_variable_t  *var, *v;
 
-    for (v = ngx_http_request_cookies_filter_vars; v->name.len; v++) {
+    for (v = ngx_http_cookies_filter_vars; v->name.len; v++) {
         var = ngx_http_add_variable(cf, &v->name, v->flags);
         if (var == NULL) {
             return NGX_ERROR;
@@ -158,7 +158,7 @@ ngx_http_request_cookies_filter_add_variables(ngx_conf_t *cf)
  * is not needed
  */
 static ngx_int_t
-ngx_http_request_cookies_filter_fallback_variable(ngx_http_request_t *r,
+ngx_http_cookies_filter_fallback_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
     size_t            len;
@@ -225,13 +225,13 @@ ngx_http_request_cookies_filter_fallback_variable(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_request_cookies_filter_parse_cookies(ngx_http_request_t *r,
+ngx_http_cookies_filter_parse_cookies(ngx_http_request_t *r,
     ngx_array_t *cookies)
 {
-    ngx_table_elt_t                         *h;
-    u_char                                  *start, *end, *last;
-    ngx_http_request_cookie_t               *cookie;
-    ngx_str_t                                name, value;
+    ngx_table_elt_t                 *h;
+    u_char                          *start, *end, *last;
+    ngx_http_cookie_t               *cookie;
+    ngx_str_t                        name, value;
 
     h = r->headers_in.cookie;
     if (h == NULL) {
@@ -292,24 +292,23 @@ ngx_http_request_cookies_filter_parse_cookies(ngx_http_request_t *r,
 
 
 static ngx_int_t
-ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
+ngx_http_filtered_cookies_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data)
 {
-    ngx_http_request_cookies_filter_loc_conf_t  *clcf;
+    ngx_http_cookies_filter_loc_conf_t  *clcf;
 
-    ngx_array_t                             *cookies, *new_cookies;
-    ngx_http_request_cookie_t               *cookie, *new_cookie;
-    ngx_http_request_cookies_filter_rule_t  *rule;
-    ngx_table_elt_t                         *h;
-    ngx_uint_t                               i, j, k;
-    ngx_str_t                                value;
-    ngx_str_t                               *n;
-    u_char                                  *p, *start, *end, *last;
-    ngx_uint_t                               parsed, found, applied, filtered;
-    ngx_uint_t                               op;
+    ngx_array_t                     *cookies, *new_cookies;
+    ngx_http_cookie_t               *cookie, *new_cookie;
+    ngx_http_cookies_filter_rule_t  *rule;
+    ngx_table_elt_t                 *h;
+    ngx_uint_t                       i, j, k;
+    ngx_str_t                        value;
+    ngx_str_t                       *n;
+    u_char                          *p, *start, *end, *last;
+    ngx_uint_t                       parsed, found, applied, filtered;
+    ngx_uint_t                       op;
 
-    clcf = ngx_http_get_module_loc_conf(r,
-        ngx_http_request_cookies_filter_module);
+    clcf = ngx_http_get_module_loc_conf(r, ngx_http_cookies_filter_module);
 
     if (clcf->rules == NULL || clcf->rules->nelts == 0) {
         goto not_filtered;
@@ -345,7 +344,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
         op = rule[i].op;
 
-        if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL) {
+        if (op == NGX_HTTP_COOKIES_FILTER_CLEAR_ALL) {
 
             /* break after clear all cookie */
             if (rule[i].flag == 1) {
@@ -353,8 +352,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                 return NGX_OK;
             }
 
-            cookies = ngx_array_create(r->pool, 4,
-                sizeof(ngx_http_request_cookie_t));
+            cookies = ngx_array_create(r->pool, 4, sizeof(ngx_http_cookie_t));
             if (cookies == NULL) {
                 return NGX_ERROR;
             }
@@ -366,22 +364,19 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
         }
 
         if (parsed == 0) {
-            cookies = ngx_array_create(r->pool, 4,
-                sizeof(ngx_http_request_cookie_t));
+            cookies = ngx_array_create(r->pool, 4, sizeof(ngx_http_cookie_t));
             if (cookies == NULL) {
                 return NGX_ERROR;
             }
 
-            if (ngx_http_request_cookies_filter_parse_cookies(r, cookies)
-                != NGX_OK)
-            {
+            if (ngx_http_cookies_filter_parse_cookies(r, cookies) != NGX_OK) {
                 return NGX_ERROR;
             }
 
             parsed = 1;
         }
 
-        if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_APPEND) {
+        if (op == NGX_HTTP_COOKIES_FILTER_APPEND) {
 
             if (ngx_http_complex_value(r, rule[i].value, &value) != NGX_OK) {
                 return NGX_ERROR;
@@ -412,10 +407,10 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
         applied = 0;
         cookie = cookies->elts;
 
-        if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_KEEP) {
+        if (op == NGX_HTTP_COOKIES_FILTER_KEEP) {
             new_cookies = ngx_array_create(r->pool,
                 ngx_max(rule[i].name_list->nelts, 4),
-                sizeof(ngx_http_request_cookie_t));
+                sizeof(ngx_http_cookie_t));
 
             if (new_cookies == NULL) {
                 return NGX_ERROR;
@@ -488,7 +483,7 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
 
             found = 1;
 
-            if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
+            if (op == NGX_HTTP_COOKIES_FILTER_CLEAR) {
                 cookie[j].cleared = 1;
                 applied = 1;
                 filtered = 1;
@@ -496,8 +491,8 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
                 continue;
             }
                 
-            if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE
-                || op == NGX_HTTP_REQUEST_COOKIES_FILTER_SET)
+            if (op == NGX_HTTP_COOKIES_FILTER_REWRITE
+                || op == NGX_HTTP_COOKIES_FILTER_SET)
             {
 
                 if (ngx_http_complex_value(r, rule[i].value, &value)
@@ -529,8 +524,8 @@ ngx_http_filtered_request_cookies_variable(ngx_http_request_t *r,
             continue;
         }
 
-        if (op == NGX_HTTP_REQUEST_COOKIES_FILTER_ADD
-            || op == NGX_HTTP_REQUEST_COOKIES_FILTER_SET)
+        if (op == NGX_HTTP_COOKIES_FILTER_ADD
+            || op == NGX_HTTP_COOKIES_FILTER_SET)
         {
             if (ngx_http_complex_value(r, rule[i].value, &value)
                     != NGX_OK)
@@ -616,27 +611,27 @@ rebuild_cookie_header:
 not_filtered:
 
     /* fallback to $http_cookie */
-    return ngx_http_request_cookies_filter_fallback_variable(r, v, data);
+    return ngx_http_cookies_filter_fallback_variable(r, v, data);
 }
 
 
 static char *
-ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+ngx_http_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
-    ngx_http_request_cookies_filter_loc_conf_t  *clcf = conf;
+    ngx_http_cookies_filter_loc_conf_t  *clcf = conf;
 
-    ngx_str_t                                *value;
-    ngx_http_request_cookies_filter_rule_t   *rule;
-    ngx_uint_t                                i;
-    ngx_str_t                                 s;
-    ngx_str_t                                *n;
-    ngx_http_compile_complex_value_t          ccv;
+    ngx_str_t                           *value;
+    ngx_http_cookies_filter_rule_t      *rule;
+    ngx_uint_t                           i;
+    ngx_str_t                            s;
+    ngx_str_t                           *n;
+    ngx_http_compile_complex_value_t     ccv;
 
     value = cf->args->elts;
 
     if (clcf->rules == NGX_CONF_UNSET_PTR) {
         clcf->rules = ngx_array_create(cf->pool, 4,
-            sizeof(ngx_http_request_cookies_filter_rule_t));
+            sizeof(ngx_http_cookies_filter_rule_t));
         if (clcf->rules == NULL) {
             return NGX_CONF_ERROR;
         }
@@ -647,32 +642,32 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ngx_memzero(rule, sizeof(ngx_http_request_cookies_filter_rule_t));
+    ngx_memzero(rule, sizeof(ngx_http_cookies_filter_rule_t));
 
     if (value[1].data[0] == 'a' || value[1].data[0] == 'A') {
 
         if (value[1].data[1] == 'd' || value[1].data[1] == 'D') {
-            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_ADD;
+            rule->op = NGX_HTTP_COOKIES_FILTER_ADD;
 
         } else {
-            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_APPEND;
+            rule->op = NGX_HTTP_COOKIES_FILTER_APPEND;
         }
 
     } else if (value[1].data[0] == 's' || value[1].data[0] == 'S') {
-        rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_SET;
+        rule->op = NGX_HTTP_COOKIES_FILTER_SET;
 
     } else if (value[1].data[0] == 'r' || value[1].data[0] == 'R') {
-        rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_REWRITE;
+        rule->op = NGX_HTTP_COOKIES_FILTER_REWRITE;
 
     } else if (value[1].data[0] == 'c' || value[1].data[0] == 'C') {
-        rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR;
+        rule->op = NGX_HTTP_COOKIES_FILTER_CLEAR;
 
     } else if (value[1].data[0] == 'k' || value[1].data[0] == 'K') {
-        rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_KEEP;
+        rule->op = NGX_HTTP_COOKIES_FILTER_KEEP;
 
     } else {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-            "invalid action \"%V\"", &value[0]);
+            "invalid parameter: \"%V\"", &value[0]);
         return NGX_CONF_ERROR;
     }
 
@@ -684,11 +679,10 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 
     /* Parse cookie name or name_list */
-    if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_KEEP) {
+    if (rule->op == NGX_HTTP_COOKIES_FILTER_KEEP) {
         if (i == cf->args->nelts) {
             ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
-                "action \"%V\" requires a name list",
-                &value[1]);
+                "\"%V\" requires a name list", &value[1]);
             return NGX_CONF_ERROR;
         }
 
@@ -734,10 +728,10 @@ ngx_http_request_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     i++;
 
-    if (rule->op == NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR) {
+    if (rule->op == NGX_HTTP_COOKIES_FILTER_CLEAR) {
         
         if (rule->name.len == 1 && rule->name.data[0] == '*') {
-            rule->op = NGX_HTTP_REQUEST_COOKIES_FILTER_CLEAR_ALL;
+            rule->op = NGX_HTTP_COOKIES_FILTER_CLEAR_ALL;
         }
 
         goto parse_tail;
@@ -794,7 +788,8 @@ parse_tail:
 
             ccv.cf = cf;
             ccv.value = &s;
-            ccv.complex_value = ngx_palloc(cf->pool, sizeof(ngx_http_complex_value_t));
+            ccv.complex_value = ngx_palloc(cf->pool,
+                sizeof(ngx_http_complex_value_t));
             if (ccv.complex_value == NULL) {
                 return NGX_CONF_ERROR;
             }
@@ -833,12 +828,11 @@ parse_tail:
 
 
 static void *
-ngx_http_request_cookies_filter_create_loc_conf(ngx_conf_t *cf)
+ngx_http_cookies_filter_create_loc_conf(ngx_conf_t *cf)
 {
-    ngx_http_request_cookies_filter_loc_conf_t  *conf;
+    ngx_http_cookies_filter_loc_conf_t  *conf;
 
-    conf = ngx_pcalloc(cf->pool,
-        sizeof(ngx_http_request_cookies_filter_loc_conf_t));
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_cookies_filter_loc_conf_t));
     if (conf == NULL) {
         return NULL;
     }
@@ -851,20 +845,20 @@ ngx_http_request_cookies_filter_create_loc_conf(ngx_conf_t *cf)
 
 
 static char *
-ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
+ngx_http_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     void *child)
 {
-    ngx_http_request_cookies_filter_loc_conf_t *prev = parent;
-    ngx_http_request_cookies_filter_loc_conf_t *conf = child;
+    ngx_http_cookies_filter_loc_conf_t *prev = parent;
+    ngx_http_cookies_filter_loc_conf_t *conf = child;
 
-    ngx_array_t                             *new_rules;
-    ngx_http_request_cookies_filter_rule_t  *pr, *cr, *nr;
-    ngx_uint_t                               i;
+    ngx_array_t                        *new_rules;
+    ngx_http_cookies_filter_rule_t     *pr, *cr, *nr;
+    ngx_uint_t                          i;
 
     ngx_conf_merge_uint_value(conf->inherit_mode, prev->inherit_mode,
-                              NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON);
+                              NGX_HTTP_COOKIES_FILTER_INHERIT_ON);
 
-    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_OFF) {
+    if (conf->inherit_mode == NGX_HTTP_COOKIES_FILTER_INHERIT_OFF) {
         if (conf->rules == NGX_CONF_UNSET_PTR) {
             conf->rules = NULL;
         }
@@ -881,11 +875,11 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
-    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_ON) {
+    if (conf->inherit_mode == NGX_HTTP_COOKIES_FILTER_INHERIT_ON) {
         return NGX_CONF_OK;
     }
 
-    if (conf->inherit_mode == NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_AFTER) {
+    if (conf->inherit_mode == NGX_HTTP_COOKIES_FILTER_INHERIT_AFTER) {
         pr = prev->rules->elts;
         for (i = 0; i < prev->rules->nelts; i++) {
             cr = ngx_array_push(conf->rules);
@@ -899,10 +893,10 @@ ngx_http_request_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
         return NGX_CONF_OK;
     }
 
-    /* NGX_HTTP_REQUEST_COOKIES_FILTER_INHERIT_BEFORE */
+    /* NGX_HTTP_COOKIES_FILTER_INHERIT_BEFORE */
     new_rules = ngx_array_create(cf->pool,
         prev->rules->nelts + conf->rules->nelts,
-        sizeof(ngx_http_request_cookies_filter_rule_t));
+        sizeof(ngx_http_cookies_filter_rule_t));
 
     if (new_rules == NULL) {
         return NGX_CONF_ERROR;
