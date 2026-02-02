@@ -629,7 +629,7 @@ ngx_http_cookies_filter(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     value = cf->args->elts;
 
-    if (clcf->rules == NGX_CONF_UNSET_PTR) {
+    if (clcf->rules == NULL) {
         clcf->rules = ngx_array_create(cf->pool, 4,
             sizeof(ngx_http_cookies_filter_rule_t));
         if (clcf->rules == NULL) {
@@ -837,7 +837,6 @@ ngx_http_cookies_filter_create_loc_conf(ngx_conf_t *cf)
         return NULL;
     }
 
-    conf->rules = NGX_CONF_UNSET_PTR;
     conf->inherit_mode = NGX_CONF_UNSET_UINT;
 
     return conf;
@@ -858,20 +857,14 @@ ngx_http_cookies_filter_merge_loc_conf(ngx_conf_t *cf, void *parent,
     ngx_conf_merge_uint_value(conf->inherit_mode, prev->inherit_mode,
                               NGX_HTTP_COOKIES_FILTER_INHERIT_ON);
 
-    if (conf->inherit_mode == NGX_HTTP_COOKIES_FILTER_INHERIT_OFF) {
-        if (conf->rules == NGX_CONF_UNSET_PTR) {
-            conf->rules = NULL;
-        }
-
+    if (conf->inherit_mode == NGX_HTTP_COOKIES_FILTER_INHERIT_OFF
+        || prev->rules == NULL)
+    {
         return NGX_CONF_OK;
     }
 
-    if (conf->rules == NGX_CONF_UNSET_PTR) {
-        conf->rules = (prev->rules == NGX_CONF_UNSET_PTR) ? NULL : prev->rules;
-        return NGX_CONF_OK;
-    }
-
-    if (prev->rules == NGX_CONF_UNSET_PTR || prev->rules == NULL) {
+    if (conf->rules == NULL) {
+        conf->rules = prev->rules;
         return NGX_CONF_OK;
     }
 
